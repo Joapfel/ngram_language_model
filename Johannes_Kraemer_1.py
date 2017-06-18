@@ -99,34 +99,32 @@ class Ngram(object):
 
 
 
-path = "assignment1-data"
-n = Ngram()
-#n.update(['This', 'is', 'a', 'sentence', '.'])
-#print(n.cross_entropy(['This', 'is', 'a', 'sentence', '.', 'This', 'is', 'a', 'sentence', '.']))
-#print(n.perplexity([['This', 'is', 'a', 'sentence', '.'], ['This', 'is', 'a', 'sentence', '.']], 0))
 
+#n = Ngram()
+
+#path = "assignment1-data"
 #for filename in os.listdir(path):
 #    if filename is not "c00.txt" and filename is not "d00.txt":
 
 
-for sent in tokenize("assignment1-data/c01.txt"):
-    n.update(sent)
-for sent in tokenize("assignment1-data/c02.txt"):
-    n.update(sent)
-for sent in tokenize("assignment1-data/c03.txt"):
-    n.update(sent)
-for sent in tokenize("assignment1-data/c04.txt"):
-    n.update(sent)
-for sent in tokenize("assignment1-data/c05.txt"):
-    n.update(sent)
+#for sent in tokenize("assignment1-data/c01.txt"):
+#    n.update(sent)
+#for sent in tokenize("assignment1-data/c02.txt"):
+#    n.update(sent)
+#for sent in tokenize("assignment1-data/c03.txt"):
+#    n.update(sent)
+#for sent in tokenize("assignment1-data/c04.txt"):
+#    n.update(sent)
+#for sent in tokenize("assignment1-data/c05.txt"):
+#    n.update(sent)
 
-x = tokenize("assignment1-data/c06.txt")
-print(n.perplexity(x))
-
-estm = n.estimate_alpha(x)
-print(estm)
-
-print(n.perplexity(x, estm))
+# x = tokenize("assignment1-data/c06.txt")
+# print(n.perplexity(x))
+#
+# estm = n.estimate_alpha(x)
+# print(estm)
+#
+# print(n.perplexity(x, estm))
 
 
 
@@ -174,6 +172,8 @@ class BackoffNgram(object):
                 self.n_2gram[ngram[:-2]] += 1
             else:
                 self.n_2gram[ngram[:-2]] = 1
+
+    def update_singletons(self):
         #update singletons for ngrams
         self.singletons_n_grams = set()
         for ngram in self.counts:
@@ -184,12 +184,12 @@ class BackoffNgram(object):
         for n1gram in self.n_1gram:
             if self.n_1gram[n1gram] == 1:
                 self.singletons_n1_grams.add(n1gram)
+
+    def update_hyperparameters(self):
         #update lambda
         self.lmbda = len(self.singletons_n_grams) / sum(self.counts.values())
         #update beta
         self.beta = len(self.singletons_n1_grams) / sum(self.n_1gram.values())
-
-
 
     # get ngrams from list of tokens (helper method for update)
     def ngrams(self, sequence):
@@ -199,18 +199,63 @@ class BackoffNgram(object):
         return zip(*[t[i:] for i in range(self.n)])
 
     def prob(self, sequence, alpha=1.0):
-        p = 1
+        p = 0
         for ngram in self.ngrams(sequence):
             if self.counts[ngram] > 0:
-                p *= (1-self.lmbda) * (self.counts[ngram] / self.n_1gram[ngram[:-1]])
+                p += (1-self.lmbda) * np.log2((self.counts[ngram]))  -np.log2(self.n_1gram[ngram[:-1]])
             elif self.n_1gram[ngram[:-1]] > 0:
-                p *= self.lmbda * (1-self.beta) * (self.n_1gram[ngram[:-1]] / self.n_2gram[ngram[:-2]])
+                p += self.lmbda * (1-self.beta) * np.log2((self.n_1gram[ngram[:-1]])) -np.log2(self.n_2gram[ngram[:-2]])
             else:
-                p *= self.lmbda * self.beta * ((self.n_2gram[ngram[:-2]] + alpha) / sum(self.n_2gram.values()) + (alpha * len(self.vocab)))
+                p += self.lmbda * self.beta * np.log2(((self.n_2gram[ngram[:-2]] + alpha))) -np.log2(sum(self.n_2gram.values()) + (alpha * len(self.vocab)))
         return p
 
     def cross_entropy(self, sequence, alpha=1.0):
-        return -(1 / len(sequence)) * log2(self.prob(sequence, alpha))
+        seq_length = 0
+        mle = 0
+        for sent in sequence:
+            seq_length += len(sent) + 1
+            mle += self.prob(sent, alpha)
+        return -(1 / seq_length) * mle
 
     def perplexity(self, sequence, alpha=1.0):
         return pow(2, self.cross_entropy(sequence, alpha))
+
+    def estimate_alpha(self, sequence):
+        lowest = 1
+        prev_estimate = self.cross_entropy(sequence, 1.0)
+        for alpha in [x * 0.01 for x in range(101)]:
+            estimate = self.cross_entropy(sequence, alpha)
+            print(alpha)
+            print(estimate)
+            print()
+            if estimate < prev_estimate:
+                lowest = alpha
+            prev_estimate = estimate
+        return lowest
+
+
+
+
+b = BackoffNgram()
+
+for sent in tokenize("assignment1-data/c01.txt"):
+    b.update(sent)
+#for sent in tokenize("assignment1-data/c02.txt"):
+#    b.update(sent)
+#for sent in tokenize("assignment1-data/c03.txt"):
+#    b.update(sent)
+#for sent in tokenize("assignment1-data/c04.txt"):
+#    b.update(sent)
+#for sent in tokenize("assignment1-data/c05.txt"):
+#    b.update(sent)
+#
+b.update_singletons()
+b.update_hyperparameters()
+
+x = tokenize("assignment1-data/c06.txt")
+print(b.perplexity(x))
+
+x2 = b.perplexity([['He', 'stooped', 'and', 'kissed', 'her', '.']])
+print(x2)
+
+print(b.estimate_alpha(x))
