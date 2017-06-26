@@ -51,11 +51,11 @@ class Ngram(object):
     def prob_mle(self, sequence):
         if isinstance(sequence, str):
             sequence = nltk.word_tokenize(sequence)
-        mle = 1.0
+        mle = 0.0
         for ngram in self.ngrams(sequence):
             #check if n-1gram has p > 0
             if self.n_1gram[ngram[:-1]] > 0:
-                mle *= self.counts[ngram] / self.n_1gram[ngram[:-1]]
+                mle += np.log2(self.counts[ngram]) -np.log2(self.n_1gram[ngram[:-1]])
         return  mle
 
     #returns the probability of the given sequence with additive smoothing.
@@ -170,11 +170,11 @@ class BackoffNgram(object):
         p = 0
         for ngram in self.ngrams(sequence):
             if self.counts[ngram] > 0:
-                p += (1-self.lmbda) * np.log2((self.counts[ngram]))  -np.log2(self.n_1gram[ngram[:-1]])
+                p += np.log2((1-self.lmbda)) + np.log2((self.counts[ngram]))  -np.log2(self.n_1gram[ngram[:-1]])
             elif self.n_1gram[ngram[:-1]] > 0:
-                p += self.lmbda * (1-self.beta) * np.log2((self.n_1gram[ngram[:-1]])) -np.log2(self.n_2gram[ngram[:-2]])
+                p += np.log2(self.lmbda) + (1-self.beta) * np.log2((self.n_1gram[ngram[:-1]])) -np.log2(self.n_2gram[ngram[:-2]])
             else:
-                p += self.lmbda * self.beta * np.log2(((self.n_2gram[ngram[:-2]] + self.estimated_alpha))) -np.log2(sum(self.n_2gram.values()) + (self.estimated_alpha * len(self.vocab)))
+                p += np.log2(self.lmbda) + self.beta * np.log2(((self.n_2gram[ngram[:-2]] + self.estimated_alpha))) -np.log2(sum(self.n_2gram.values()) + (self.estimated_alpha * len(self.vocab)))
         return p
 
     def cross_entropy(self, sequence):
